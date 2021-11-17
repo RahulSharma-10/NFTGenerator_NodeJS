@@ -1,24 +1,25 @@
 
-const fs= require("fs");
+import { writeFileSync } from "fs";
 const myArgs = process.argv.slice(2);
-const {createCanvas, loadImage} = require("canvas");
-const {layers, width, height} = require("./layers/config.js");
-const canvas = createCanvas(width,height);
-const console = require("console");
-const { decode } = require("punycode");
-const ctx = canvas.getContext("2d");
+import { createCanvas, loadImage } from "canvas";
+import { layers, width, height } from "./nft/config.js";
+import { log } from "console";
+import { decode } from "punycode";
 const edition = myArgs.length> 0 ? Number(myArgs[0]): 1;
+const Exists = new Map();
 
 var metadata = [];
 var attributes = [];
 var hash = [];
 var decodedhash= [];
+var dnaList = [];
 
 //Redraw and save the layer, Need to observe to save it.
 
 const savelayer = (_canvas, _edition) => {
-    fs.writeFileSync(`./output/${_edition}.png`, _canvas.toBuffer("image/png")); //Converting our Canvas to buffer
-    console.log("Image Created");
+    
+    writeFileSync(`./output/${_edition}.png`, _canvas.toBuffer("image/png")); //Converting our Canvas to buffer
+    // console.log("Image Created");
 }
 
 const addMetaData = (_edition) => {
@@ -52,35 +53,55 @@ const addAttributes = (_element, _layer) => {
 
 };
 
-const drawlayer = async (_layer, _edition) => {
+const drawlayer = async (_layer, _edition, canvas, ctx) => {
 
-    const random_idx = Math.floor(Math.random()*_layer.elements.length);
+    const random_idx = Math.floor(Math.random()*(_layer.elements.length));
+
+
     let element = _layer.elements[random_idx];
-    addAttributes(element, _layer);
-    const image = await loadImage(`${_layer.location}${element.fileName}`);
+    // console.log(element);
+    
+    if(element){
 
+        addAttributes(element, _layer);
+    const image = await loadImage(`${_layer.location}${element.fileName}`);
+    
     ctx.drawImage(image, 
         _layer.position.x,
         _layer.position.y, 
         _layer.size.width, 
         _layer.size.height); // We can adjust, the x, y, h, w limits to get some parts
-
-    console.log(`I created the ${_layer.name} and choose ${element.name}`);
+    }
+    log(`I created the ${_layer.name} and choose ${element.name}`);
     savelayer(canvas, _edition);
+    
 };
 
-for(let i=1; i<=edition;i++)
-{
-    layers.forEach(layer => {
-        // console.log(layer);
-        drawlayer(layer, i);
-    })
-    addMetaData(i);
+const createDNA = (_len) => {
+    
+    let num_zero = _len*2-1;
+    let randNum = Math.floor(Number(`1e${num_zero}`) + Math.random()*Number(`9e${num_zero}`));
+    return randNum;
+};
 
-    console.log("Creating edition " + i);
-}
+const writeMetaData = () => {
+    writeFileSync("./output/_metadata.json", JSON.stringify(metadata));
+};
 
-fs.readFile("./output/_metadata.json", (err, data) => {
-    if(err) throw err;
-    fs.writeFileSync("./output/_metadata.json", JSON.stringify(metadata));
-});
+const createNFT = () => {
+    
+    let editioncount = 1;
+    while(editioncount<=edition)
+    {
+        // let canvas = createCanvas(width,height);
+        // let ctx = canvas.getContext("2d");
+        // layers.forEach((layer) => {
+        //     drawlayer(layer, i, canvas, ctx);
+        // }); 
+        
+        log(`Random Number is ${createDNA()}`);
+        editioncount++;
+    }
+
+createNFT();
+writeMetaData();

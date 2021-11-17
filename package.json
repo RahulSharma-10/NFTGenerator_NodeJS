@@ -10,5 +10,8 @@
   "license": "ISC",
   "dependencies": {
     "canvas": "^2.8.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.4.0"
   }
 }
