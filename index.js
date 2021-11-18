@@ -1,80 +1,103 @@
-
-import { writeFileSync } from "fs";
+const fs= require("fs");
 const myArgs = process.argv.slice(2);
-import { createCanvas, loadImage } from "canvas";
-import { layers, width, height } from "./nft/config.js";
-import { log } from "console";
-import { decode } from "punycode";
+const {createCanvas, loadImage} = require("canvas");
+const {layers, width, height} = require("./nft/config.js");
+const canvas = createCanvas(width,height);
+const ctx = canvas.getContext("2d");
+const console = require("console");
+const { decode } = require("punycode");
 const edition = myArgs.length> 0 ? Number(myArgs[0]): 1;
 const Exists = new Map();
 
-var metadata = [];
-var attributes = [];
-var hash = [];
-var decodedhash= [];
+var metadataList = [];
+var attributesList = [];
+
 var dnaList = [];
 
 //Redraw and save the layer, Need to observe to save it.
 
-const savelayer = (_canvas, _edition) => {
+const saveImage = ( _editionCount) => {
     
-    writeFileSync(`./output/${_edition}.png`, _canvas.toBuffer("image/png")); //Converting our Canvas to buffer
+    fs.writeFileSync(`./output/${_edition}.png`, canvas.toBuffer("image/png")); //Converting our Canvas to buffer
     // console.log("Image Created");
 }
 
-const addMetaData = (_edition) => {
+const addMetaData = (_dna, _edition) => {
 
     let DateTime = Date.now();
     let tempMetaData = {
-        hash: hash.join(""),
-        decodedhash: decodedhash,
-        edition: "",
+        dna: _dna,
+        edition: _edition,
         date: DateTime,
-        attributes: attributes,
+        attributes: attributesList,
     };
-    metadata.push(tempMetaData);
-    attributes= [];
-    hash= [];
-    decodedhash= [];
-
+    metadataList.push(tempMetaData);
+    dnaList.push(_dna);
+    attributesList= [];
+    
 };
 
-const addAttributes = (_element, _layer) => {
-    let tempAttr = {
-        id: _element.id,
-        layer: _layer.name,
-        name: _element.name,
-        rarity: _element.rarity
-    }
-    attributes.push(tempAttr);
-    hash.push(_layer.id);
-    hash.push(_element.id);
-    decodedhash.push({[_layer.id]: _element.id});
-
+const addAttributes = (_element) => {
+    let selectedElement = _element.layer.selectedElement;
+    attributesList.push({
+        name: selectedElement.name,
+        rarity: selectedElement.rarity,
+    });
 };
 
-const drawlayer = async (_layer, _edition, canvas, ctx) => {
+const loadLayerImg = async (_layer) => {
 
-    const random_idx = Math.floor(Math.random()*(_layer.elements.length));
+    return new Promise(async(resolve) => {
 
+        const image = await loadImage(`${_layer.location}${_layer.selectedElement.fileName}`);
+        resolve({layer: _layer, loadedImage: image})
+    });
 
-    let element = _layer.elements[random_idx];
-    // console.log(element);
     
-    if(element){
+};
 
-        addAttributes(element, _layer);
-    const image = await loadImage(`${_layer.location}${element.fileName}`);
+const drawElement = (_element) => {
+    console.log(_element);
     
-    ctx.drawImage(image, 
-        _layer.position.x,
-        _layer.position.y, 
-        _layer.size.width, 
-        _layer.size.height); // We can adjust, the x, y, h, w limits to get some parts
+    ctx.drawImage(
+        _element.loadimage, 
+        _element.layer.position.x,
+        _element.layer.position.y, 
+        _element.layer.size.width, 
+        _element.layer.size.height, // We can adjust, the x, y, h, w limits to get some parts
+    );
+    addAttributes(_element);
+};
+
+const constructLayerToDna = (_dna, _layer) => {
+
+    let DnaSegment = _dna.toString().match(/.{1,2}/g);
+    let mappedDnaToLayers = _layer.map((layer) =>{
+        let selectedElement = layer.elements[parseInt(DnaSegment)% layer.elements.length]
+        return {
+            location:  layer.location,
+            position: layer.position,
+            size: layer.size,
+            selectedElement: selectedElement,
+        };
+    });
+    return mappedDnaToLayers;
+};
+
+const checkDNA = (_DnaList = [], val) => {
+   
+    let found=0;
+    let size=  _DnaList.length;
+    for(var i=0;i<size;i++)
+    {
+        if(_DnaList[i]===val)
+        {
+            found= 1;
+            break;
+        }
     }
-    log(`I created the ${_layer.name} and choose ${element.name}`);
-    savelayer(canvas, _edition);
-    
+
+    return (found==0)?true:false;
 };
 
 const createDNA = (_len) => {
@@ -84,24 +107,48 @@ const createDNA = (_len) => {
     return randNum;
 };
 
-const writeMetaData = () => {
-    writeFileSync("./output/_metadata.json", JSON.stringify(metadata));
+const writeMetaData= (_data) => {
+    fs.writeFileSync("./output/_metadata.json", _data);
 };
 
 const createNFT = () => {
-    
+
+    writeMetaData(""); //Clears up the file
     let editioncount = 1;
-    while(editioncount<=edition)
-    {
-        // let canvas = createCanvas(width,height);
-        // let ctx = canvas.getContext("2d");
-        // layers.forEach((layer) => {
-        //     drawlayer(layer, i, canvas, ctx);
-        // }); 
-        
-        log(`Random Number is ${createDNA()}`);
-        editioncount++;
+    const layers_len = layers.length;
+
+    while (editioncount <= edition) {
+
+        let newDNA= createDNA(layers_len);
+
+
+        if(checkDNA(dnaList, newDNA)){
+
+            let result = constructLayerToDna(newDNA, layers);
+            let loadedElements = []; //promise array
+
+           result.forEach(layer => {
+              loadedElements.push(loadLayerImg(layer)); //promise
+           });
+            
+           Promise.all(loadedElements).then(elementArray => {
+                elementArray.forEach(element =>{
+                    drawElement(element);
+                })
+                saveImage( editioncount);
+                addMetaData(newDNA, editioncount);
+                console.log(`Created edition: ${editioncount} with DNA: ${newDNA}`);
+           });
+            editioncount++;
+
+        }else{
+            console.log('not generated');
+        }
+        writeMetaData(JSON.stringify(metadataList));
     }
+};
+
 
 createNFT();
-writeMetaData();
+
+
