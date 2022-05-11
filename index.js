@@ -18,7 +18,7 @@ var dnaList = [];
 
 const saveImage = ( _editionCount) => {
     
-    fs.writeFileSync(`./output/${_edition}.png`, canvas.toBuffer("image/png")); //Converting our Canvas to buffer
+    fs.writeFileSync(`./output/${_edition}.png`, canvas.toBuffer("image/png")); //Converting our Canvas to buffer (Uses Uint8 Array & atob() and optimises speed)
     // console.log("Image Created");
 }
 
@@ -103,7 +103,7 @@ const checkDNA = (_DnaList = [], val) => {
 const createDNA = (_len) => {
     
     let num_zero = _len*2-1;
-    let randNum = Math.floor(Number(`1e${num_zero}`) + Math.random()*Number(`9e${num_zero}`));
+    let randNum = Math.floor(Number(`1e${num_zero}`) + Math.random()*Number(`9e${num_zero}`)); //Hashing
     return randNum;
 };
 
